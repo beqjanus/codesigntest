@@ -31,7 +31,7 @@ jobs:
       env:
         FASTLANE_USER: beqjanus@gmail.com
         FASTLANE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      run: fastlane run_produce --username $FASTLANE_USER --csr_path certificate.csr
+      run: fastlane produce --username $FASTLANE_USER --csr_path certificate.csr
 
     - name: Convert CER to P12
       run: |
