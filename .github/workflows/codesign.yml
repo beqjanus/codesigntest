@@ -1,0 +1,51 @@
+name: Code Signing Workflow
+on:
+  push:
+    branches:
+      - main
+env:
+  KEY_PASSWORD: ${{ secrets.CERT_PASS }}
+  
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v2
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+        
+    - name: Generate CSR and Private Key
+      run: |
+        openssl req -new -newkey rsa:2048 -nodes -keyout private.key -out certificate.csr -subj "/C=US/ST=California/L=San Francisco/O=Your Organization/CN=Your Certificate Name"
+        
+        
+    - name: Submit CSR to Apple
+      run: |
+        transporter produce -c certificate.csr --username your_apple_id --password your_apple_password
+
+    - name: Convert CER to P12
+      run: |
+        openssl pkcs12 -export -out certificate.p12 -inkey private.key -in certificate.cer
+    
+    - name: Create Keychain and Import P12
+      run: |
+        security create-keychain -p '' keychain.keychain
+        security import certificate.p12 -k keychain.keychain -P $KEY_PASSWORD -T /usr/bin/codesign
+        security list-keychain -s keychain.keychain
+        security default-keychain -s keychain.keychain
+
+    - name: Get Code Signing Identity
+      id: codeSigningIdentity
+      run: |
+        CODE_SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | awk '{print $2}')
+        echo "::set-output name=identity::$CODE_SIGN_IDENTITY"
+
+    - name: Code Sign
+      run: |
+        codesign -s "${{ steps.codeSigningIdentity.outputs.identity }}" --keychain keychain.keychain --timestamp --verbose=4 .
+  
